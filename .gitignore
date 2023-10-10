@@ -5,3 +5,4 @@ __pycache__
 Financial_News/*.csv
 Financial_News/trained/*.csv
 .DS_Store
+config.yaml
