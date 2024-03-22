@@ -75,8 +75,8 @@ def financial_dataset(stock, num_of_labels=2, cutoff=0.25,
         
     return fin_data
 
-def read_news(stock):
-    def read_rph(stock) :
+def read_news(stock, stockHeadline):
+    def read_rph(stock, stockHeadline) :
         ''' Reads news relevant to 'stock' from the "raw_partner_headlines.csv" csv file. 
             Returns a dataframe in the format :[ Headline | date | stock  ] '''
 
@@ -85,18 +85,28 @@ def read_news(stock):
         arp = arp.drop(columns=['Unnamed: 0', 'url', 'publisher'], axis=1)
         # Format the date column to match financial dataset
         arp['date'] = arp['date'].apply(lambda x: x.split(' ')[0] )
-        news = arp[arp['stock'] == stock]
+        newsTicker = arp[arp['stock'] == stock]
+        if stockHeadline:
+            newsHeadline = arp[arp['headline'].str.contains(stockHeadline)]
+            news = pd.concat([newsTicker, newsHeadline], axis=0)
+        else:
+            news = newsTicker
         print(f"The bot found {news.shape[0]} headlines from raw_partner_headlines.csv, regarding {stock} stock")
         return news
 
-    def read_arp(stock) :
+    def read_arp(stock, stockHeadline) :
         ''' Reads news relevant to 'stock' from the "analyst_rating_processed.csv" csv file. 
         Returns a dataframe in the format :[ Headline | date | stock  ] '''
         csv_path = 'Financial_News/analyst_ratings_processed.csv'
         arp = pd.read_csv(csv_path)
         arp = arp.drop(columns=['Unnamed: 0'], axis=1)
         # pick the stock headlines
-        arp = arp[arp['stock'] == stock]
+        arpTicker = arp[arp['stock'] == stock]
+        if stockHeadline:
+            arpHeadline = arp[arp['title'].str.contains(stockHeadline)]
+            arp = pd.concat([arpTicker, arpHeadline], axis=0)
+        else:
+            arp = arpTicker
         # Format the date column to match financial dataset (only keep date, not time)
         arp['date'] = arp['date'].apply(lambda x: str(x).split(' ')[0] )
         # Rename column title to headline to match other csv
@@ -105,8 +115,8 @@ def read_news(stock):
         print(f"The bot found {news.shape[0]} headlines from analyst_ratings_processed.csv, regarding {stock} stock")
         return news
     
-    arp = read_arp(stock)
-    rph = read_rph(stock)
+    arp = read_arp(stock, stockHeadline)
+    rph = read_rph(stock, stockHeadline)
     news = pd.concat([rph, arp], ignore_index=True)
     print(f"The bot found {news.shape[0]} headlines in total, regarding {stock} stock")
     return news
@@ -119,7 +129,9 @@ def merge_fin_news(df_fin, df_news, how='inner') :
     merged_df = df_fin.merge(df_news, on='date', how=how)
     # rearrange column order
     merged_df = merged_df[['date', 'stock', 'Open', 'Close', 'Volume',  'headline', 'Price_change']]
-    return merged_df
+
+    merged_df_unique = merged_df.drop_duplicates(subset=['date', 'headline'], keep='first')
+    return merged_df_unique
 
 def sentim_analyzer(df, tokenizer, model):
     ''' Given a df that contains a column 'headline' with article healine texts, it runs inference on the healine with the 'model' (FinBert) 
